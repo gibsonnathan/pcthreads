@@ -27,12 +27,14 @@ static int numberOfProducers;
 static int numberOfConsumers;
 static int numberOfWidgets;
 static int timeToWait;
+static int numberProduced;
 static pthread_mutex_t produceLock;
 static pthread_mutex_t consumeLock;
 
 
 int main(int argc, const char * argv[]) {
     head = NULL; //queue is initially empty
+    numberProduced = 0;
     numberOfProducers = atoi(argv[1]);
     numberOfConsumers = atoi(argv[2]);
     numberOfWidgets = atoi(argv[3]);
@@ -67,6 +69,7 @@ void* producer(){
         nanosleep(&period, NULL);
         pthread_mutex_lock(&produceLock);
         enqueue(widg);
+        numberProduced++;
         pthread_mutex_unlock(&produceLock);
     }
     pthread_exit(NULL);
@@ -74,13 +77,13 @@ void* producer(){
 }
 
 void* consumer(){
+    if(numberProduced >= numberOfProducers * numberOfWidgets && isEmpty()){
+        pthread_exit(NULL);
+    }
     long waitTime = rand() % (timeToWait + 1);
     struct timespec period;
     period.tv_nsec = waitTime / 1000;
     for(int i = 0; i < numberOfConsumers; i++){
-        if (isEmpty()) { //and producer is done producing
-            pthread_exit(NULL);
-        }
         struct widget* widg;
         pthread_mutex_lock(&consumeLock);
         widg = dequeue();
