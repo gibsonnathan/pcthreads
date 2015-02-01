@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <time.h>
 
 struct widget{
     pthread_t producersID;
@@ -22,50 +23,72 @@ struct widget* dequeue();
 int isEmpty();
 void* producer();
 void* consumer();
+static int numberOfProducers;
+static int numberOfConsumers;
+static int numberOfWidgets;
+static int timeToWait;
+static pthread_mutex_t produceLock;
+static pthread_mutex_t consumeLock;
+
 
 int main(int argc, const char * argv[]) {
-    
     head = NULL; //queue is initially empty
-
-    //get command line arguments
-    //int numberOfProducers = atoi(argv[1]);
-    //int numberOfConsumers = atoi(argv[2]);
-    //int numberOfWidgets = atoi(argv[3]);
-    //int timeToWait = atoi(argv[4]);
+    numberOfProducers = atoi(argv[1]);
+    numberOfConsumers = atoi(argv[2]);
+    numberOfWidgets = atoi(argv[3]);
+    timeToWait = atoi(argv[4]);
+    pthread_t arrayOfProducerThreads[numberOfProducers];
+    pthread_t arrayOfConsumerThreads[numberOfConsumers];
     
-    //testing queue
-    struct widget* widg1 = (struct widget*)malloc(sizeof(struct widget));
-    struct widget* widg2 = (struct widget*)malloc(sizeof(struct widget));
-    struct widget* widg3 = (struct widget*)malloc(sizeof(struct widget));
-    struct widget* widg4 = (struct widget*)malloc(sizeof(struct widget));
     
-    widg1 -> widgetNumber = 1;
-    widg2 -> widgetNumber = 2;
-    widg3 -> widgetNumber = 3;
-    widg4 -> widgetNumber = 4;
-    
-    enqueue(widg1);
-    enqueue(widg2);
-    enqueue(widg3);
-    enqueue(widg4);
-
-    //have to make sure that head isn't NULL before
-    //trying to access its members
-    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
-    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
-    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
-    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
-    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
-    
+    for (int i = 0; i < numberOfProducers; i++) {
+        pthread_create(&arrayOfProducerThreads[i], NULL, producer, NULL);
+    }
+    for (int i = 0; i < numberOfConsumers; i++) {
+        pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL);
+    }
+    for (int i = 0; i < numberOfProducers; i++) {
+        pthread_join(arrayOfProducerThreads[i], NULL);
+    }
+    for (int i = 0; i < numberOfConsumers; i++) {
+        pthread_join(arrayOfConsumerThreads[i], NULL);
+    }
     return 0;
 }
 
 void* producer(){
-
+    long waitTime = rand() % (timeToWait + 1);
+    struct timespec period;
+    period.tv_nsec = waitTime / 1000;
+    for (int i = 0; i < numberOfWidgets; i++) {
+        struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
+        widg -> producersID = pthread_self();
+        widg -> widgetNumber = i;
+        nanosleep(&period, NULL);
+        pthread_mutex_lock(&produceLock);
+        enqueue(widg);
+        pthread_mutex_unlock(&produceLock);
+    }
+    pthread_exit(NULL);
     return NULL;
 }
 
 void* consumer(){
+    long waitTime = rand() % (timeToWait + 1);
+    struct timespec period;
+    period.tv_nsec = waitTime / 1000;
+    for(int i = 0; i < numberOfConsumers; i++){
+        if (isEmpty()) { //and producer is done producing
+            pthread_exit(NULL);
+        }
+        struct widget* widg;
+        pthread_mutex_lock(&consumeLock);
+        widg = dequeue();
+        pthread_mutex_unlock(&consumeLock);
+        printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
+        nanosleep(&period, NULL);
+    }
+    
 
     return NULL;
 }
