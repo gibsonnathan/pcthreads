@@ -28,10 +28,10 @@ int main(int argc, const char * argv[]) {
     head = NULL; //queue is initially empty
 
     //get command line arguments
-    int numberOfProducers = atoi(argv[1]);
-    int numberOfConsumers = atoi(argv[2]);
-    int numberOfWidgets = atoi(argv[3]);
-    int timeToWait = atoi(argv[4]);
+    //int numberOfProducers = atoi(argv[1]);
+    //int numberOfConsumers = atoi(argv[2]);
+    //int numberOfWidgets = atoi(argv[3]);
+    //int timeToWait = atoi(argv[4]);
     
     //testing queue
     struct widget* widg1 = (struct widget*)malloc(sizeof(struct widget));
@@ -51,14 +51,25 @@ int main(int argc, const char * argv[]) {
 
     //have to make sure that head isn't NULL before
     //trying to access its members
-    printf("%d", head ? dequeue() ->widgetNumber : -1);
-    printf("%d", head ? dequeue() ->widgetNumber : -1);
-    printf("%d", head ? dequeue() ->widgetNumber : -1);
-    printf("%d", head ? dequeue() ->widgetNumber : -1);
-    printf("%d", head ? dequeue() ->widgetNumber : -1);
+    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
+    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
+    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
+    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
+    printf("%d\n", isEmpty() ? dequeue() ->widgetNumber : -1);
     
     return 0;
 }
+
+void* producer(){
+
+    return NULL;
+}
+
+void* consumer(){
+
+    return NULL;
+}
+
 
 void enqueue(struct widget* widget){
     struct widget* newNode = (struct widget*)malloc(sizeof(struct widget));
@@ -98,10 +109,5 @@ struct widget* dequeue(){
 }
 
 int isEmpty(){
-    if (head) {
-        return 1;
-    }
-    else{
-        return 0;
-    }
+    return head ? 1 : 0;
 }
