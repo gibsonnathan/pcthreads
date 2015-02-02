@@ -33,6 +33,9 @@ static pthread_mutex_t consumeLock;
 
 
 int main(int argc, const char * argv[]) {
+    //intialization
+    pthread_mutex_init(&produceLock, NULL);
+    pthread_mutex_init(&consumeLock, NULL);
     head = NULL; //queue is initially empty
     numberProduced = 0;
     numberOfProducers = atoi(argv[1]);
@@ -46,15 +49,15 @@ int main(int argc, const char * argv[]) {
     for (int i = 0; i < numberOfProducers; i++) {
         pthread_create(&arrayOfProducerThreads[i], NULL, producer, NULL);
     }
-    for (int i = 0; i < numberOfConsumers; i++) {
-        pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL);
-    }
+    //for (int i = 0; i < numberOfConsumers; i++) {
+    //    pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL);
+    // }
     for (int i = 0; i < numberOfProducers; i++) {
         pthread_join(arrayOfProducerThreads[i], NULL);
     }
-    for (int i = 0; i < numberOfConsumers; i++) {
-        pthread_join(arrayOfConsumerThreads[i], NULL);
-    }
+    //for (int i = 0; i < numberOfConsumers; i++) {
+    //    pthread_join(arrayOfConsumerThreads[i], NULL);
+    //}
     return 0;
 }
 
@@ -69,7 +72,7 @@ void* producer(){
         nanosleep(&period, NULL);
         pthread_mutex_lock(&produceLock);
         enqueue(widg);
-        numberProduced++;
+        printf("%d",numberProduced++);
         pthread_mutex_unlock(&produceLock);
     }
     pthread_exit(NULL);
@@ -77,20 +80,10 @@ void* producer(){
 }
 
 void* consumer(){
-    if(numberProduced >= numberOfProducers * numberOfWidgets && isEmpty()){
-        pthread_exit(NULL);
-    }
     long waitTime = rand() % (timeToWait + 1);
     struct timespec period;
     period.tv_nsec = waitTime / 1000;
-    for(int i = 0; i < numberOfConsumers; i++){
-        struct widget* widg;
-        pthread_mutex_lock(&consumeLock);
-        widg = dequeue();
-        pthread_mutex_unlock(&consumeLock);
-        printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
-        nanosleep(&period, NULL);
-    }
+    
     
 
     return NULL;
