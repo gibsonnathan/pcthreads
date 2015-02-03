@@ -49,15 +49,15 @@ int main(int argc, const char * argv[]) {
     for (int i = 0; i < numberOfProducers; i++) {
         pthread_create(&arrayOfProducerThreads[i], NULL, producer, NULL);
     }
-    //for (int i = 0; i < numberOfConsumers; i++) {
-    //    pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL);
-    // }
+    for (int i = 0; i < numberOfConsumers; i++) {
+        pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL);
+     }
     for (int i = 0; i < numberOfProducers; i++) {
         pthread_join(arrayOfProducerThreads[i], NULL);
     }
-    //for (int i = 0; i < numberOfConsumers; i++) {
-    //    pthread_join(arrayOfConsumerThreads[i], NULL);
-    //}
+    for (int i = 0; i < numberOfConsumers; i++) {
+        pthread_join(arrayOfConsumerThreads[i], NULL);
+    }
     return 0;
 }
 
@@ -72,7 +72,7 @@ void* producer(){
         nanosleep(&period, NULL);
         pthread_mutex_lock(&produceLock);
         enqueue(widg);
-        printf("%d",numberProduced++);
+        numberProduced++;
         pthread_mutex_unlock(&produceLock);
     }
     pthread_exit(NULL);
@@ -80,12 +80,20 @@ void* producer(){
 }
 
 void* consumer(){
+    if (isEmpty() && numberProduced >= numberOfWidgets * numberOfProducers) {
+        pthread_exit(NULL);
+    }else if(isEmpty()){
+        pthread_yield();
+    }
     long waitTime = rand() % (timeToWait + 1);
     struct timespec period;
     period.tv_nsec = waitTime / 1000;
+    pthread_mutex_lock(&consumeLock);
+    struct widget* widg = dequeue();
+    printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
+    nanosleep(&period, NULL);
+    pthread_mutex_unlock(&consumeLock);
     
-    
-
     return NULL;
 }
 
