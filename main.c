@@ -66,13 +66,11 @@ void* producer(){
     struct timespec period;
     period.tv_nsec = waitTime / 1000;
     for (int i = 0; i < numberOfWidgets; i++) {
+        pthread_mutex_lock(&produceLock);
         struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
         widg -> producersID = pthread_self();
         widg -> widgetNumber = i;
-        //nanosleep(&period, NULL);
-        pthread_mutex_lock(&produceLock);
         enqueue(widg);
-        numberProduced++;
         pthread_mutex_unlock(&produceLock);
     }
     pthread_exit(NULL);
@@ -80,20 +78,19 @@ void* producer(){
 }
 
 void* consumer(){
-    if (isEmpty() && numberProduced >= numberOfWidgets * numberOfProducers) {
-        pthread_exit(NULL);
-    }else if(isEmpty()){
-        pthread_yield_np();
-    }
-    long waitTime = rand() % (timeToWait + 1);
-    struct timespec period;
-    period.tv_nsec = waitTime / 1000;
-    pthread_mutex_lock(&consumeLock);
-    struct widget* widg = dequeue();
-    printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
-    //nanosleep(&period, NULL);
-    pthread_mutex_unlock(&consumeLock);
     
+    while(1){
+        pthread_mutex_lock(&consumeLock);
+        if (numberProduced < numberOfWidgets) {
+            struct widget* widg = dequeue();
+            printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
+            //nanosleep(&period, NULL);
+            pthread_mutex_unlock(&consumeLock);
+        }else{
+            pthread_exit(NULL);
+        }
+    
+    }
     return NULL;
 }
 
