@@ -30,6 +30,7 @@ static int numberOfWidgets;
 static int timeToWait;
 static int numberProduced;
 static int numberConsumed;
+static struct timespec period;
 static pthread_mutex_t produceLock;
 static pthread_mutex_t consumeLock;
 static pthread_mutex_t isEmptyLock;
@@ -54,7 +55,8 @@ int main(int argc, const char * argv[]) {
     timeToWait = atoi(argv[4]);
     pthread_t arrayOfProducerThreads[numberOfProducers];
     pthread_t arrayOfConsumerThreads[numberOfConsumers];
-    
+    period.tv_sec = timeToWait / 1000;
+    period.tv_nsec = (timeToWait % 1000) * 1000 * 1000;
     for (int i = 0; i < numberOfProducers; i++) {
         if(pthread_create(&arrayOfProducerThreads[i], NULL, producer, NULL)){
             printf("Error creating producer thread\n");
@@ -93,8 +95,10 @@ void* producer(){
         widg -> widgetNumber = i;
         enqueue(widg);
         numberProduced++;
+        pthread_mutex_unlock(&produceLock);
+        nanosleep(&period, NULL);
     }
-    pthread_mutex_unlock(&produceLock);
+    
     pthread_exit(NULL);
     return NULL;
 }
@@ -102,17 +106,22 @@ void* producer(){
 void* consumer(){
     while(1){
         pthread_mutex_lock(&consumeLock);
-        if(numberConsumed >= numberOfWidgets * numberOfProducers){
-            break;
+        if((numberConsumed >= numberOfWidgets * numberOfProducers) && isEmpty()){
+            pthread_exit(NULL);
         }
         while(isEmpty()){
             pthread_yield_np();
         }
         struct widget* widg = dequeue();
         numberConsumed++;
-        printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
+        printf("consumer (thread id: %d): widget %d from thread %d\n",
+               (int)pthread_self(), widg ->widgetNumber,
+               (int)widg ->producersID);
+        
         free(widg);
         pthread_mutex_unlock(&consumeLock);
+        nanosleep(&period, NULL);
+        
     }
     return NULL;
 }
