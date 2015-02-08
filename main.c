@@ -93,14 +93,17 @@ void* producer(){
 void* consumer(){
     while(1){
         pthread_mutex_lock(&consumeLock);
-        if((numberConsumed < numberOfWidgets * numberOfProducers) && (!isEmpty())){
-            struct widget* widg = dequeue();
-            numberConsumed++;
-            printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
+        if(numberConsumed >= numberOfWidgets * numberOfProducers){
+            pthread_exit(NULL);
         }
+        while(isEmpty()){
+            pthread_yield_np();
+        }
+        struct widget* widg = dequeue();
+        numberConsumed++;
+        printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
         pthread_mutex_unlock(&consumeLock);
     }
-    pthread_exit(NULL);
     return NULL;
 }
 
