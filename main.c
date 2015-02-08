@@ -45,7 +45,7 @@ int main(int argc, const char * argv[]) {
     pthread_mutex_init(&consumeLock, NULL);
     pthread_mutex_init(&isEmptyLock, NULL);
     pthread_mutex_init(&isFullLock, NULL);
-    head = NULL; 
+    head = NULL;
     numberProduced = 0;
     numberConsumed = 0;
     numberOfProducers = atoi(argv[1]);
@@ -161,11 +161,13 @@ int isEmpty(){
 }
 
 int isFull(){
+    pthread_mutex_lock(&isFullLock);
     struct widget* returnStatus = (struct widget*)malloc(sizeof(struct widget));
-    if (returnStatus) {
+    int result = returnStatus ? 0 : 1;
+    if (result == 1) {
         free(returnStatus);
-        return 0;
-    }else{
-        return 1;
     }
+    pthread_mutex_unlock(&isFullLock);
+    return result;
+    
 }
