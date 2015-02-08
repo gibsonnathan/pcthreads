@@ -45,7 +45,7 @@ int main(int argc, const char * argv[]) {
     pthread_mutex_init(&consumeLock, NULL);
     pthread_mutex_init(&isEmptyLock, NULL);
     pthread_mutex_init(&isFullLock, NULL);
-    head = NULL; //queue is initially empty
+    head = NULL; 
     numberProduced = 0;
     numberConsumed = 0;
     numberOfProducers = atoi(argv[1]);
@@ -57,21 +57,30 @@ int main(int argc, const char * argv[]) {
     
     for (int i = 0; i < numberOfProducers; i++) {
         if(pthread_create(&arrayOfProducerThreads[i], NULL, producer, NULL)){
-            printf("Error creating thread\n");
+            printf("Error creating producer thread\n");
             exit(3);
         }
     }
+    
     for (int i = 0; i < numberOfConsumers; i++) {
         if(pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL)){
-            printf("Error creating thread\n");
+            printf("Error creating consumer thread\n");
             exit(3);
         }
      }
+    
     for (int i = 0; i < numberOfProducers; i++) {
-        pthread_join(arrayOfProducerThreads[i], NULL);
+        if(pthread_join(arrayOfProducerThreads[i], NULL)){
+            printf("Error joining producer thread");
+            exit(3);
+        }
     }
+    
     for (int i = 0; i < numberOfConsumers; i++) {
-        pthread_join(arrayOfConsumerThreads[i], NULL);
+        if(pthread_join(arrayOfConsumerThreads[i], NULL)){
+            printf("Error joining consumer thread");
+            exit(3);
+        }
     }
     return 0;
 }
@@ -94,7 +103,7 @@ void* consumer(){
     while(1){
         pthread_mutex_lock(&consumeLock);
         if(numberConsumed >= numberOfWidgets * numberOfProducers){
-            pthread_exit(NULL);
+            break;
         }
         while(isEmpty()){
             pthread_yield_np();
@@ -102,6 +111,7 @@ void* consumer(){
         struct widget* widg = dequeue();
         numberConsumed++;
         printf("consumer (thread id: %d): widget %d from thread %d\n", (int)pthread_self(), widg ->widgetNumber, (int)widg ->producersID);
+        free(widg);
         pthread_mutex_unlock(&consumeLock);
     }
     return NULL;
@@ -158,5 +168,4 @@ int isFull(){
     }else{
         return 1;
     }
-
 }
