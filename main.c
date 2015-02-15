@@ -31,14 +31,9 @@ static int numberProduced;
 static int numberConsumed;
 static int total;
 static struct timespec period;
-static pthread_mutex_t produceLock;
-static pthread_mutex_t consumeLock;
-static pthread_mutex_t isEmptyLock;
-static pthread_mutex_t isFullLock;
+static pthread_cond_t Buffer_Not_Full=PTHREAD_COND_INITIALIZER;
+static pthread_cond_t Buffer_Not_Empty=PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t lock;
-pthread_cond_t Buffer_Not_Full=PTHREAD_COND_INITIALIZER;
-pthread_cond_t Buffer_Not_Empty=PTHREAD_COND_INITIALIZER;
-pthread_mutex_t mVar=PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, const char * argv[]) {
     
@@ -46,12 +41,7 @@ int main(int argc, const char * argv[]) {
         printf("Incorrect arguments supplied\n");
         exit(-1);
     }
-    pthread_mutex_init(&produceLock, NULL);
-    pthread_mutex_init(&consumeLock, NULL);
-    pthread_mutex_init(&isEmptyLock, NULL);
-    pthread_mutex_init(&isFullLock, NULL);
-    pthread_mutex_init(&isFullLock, NULL);
-    
+    pthread_mutex_init(&lock, NULL);
     head = NULL;
     numberProduced = 0;
     numberConsumed = 0;
@@ -62,65 +52,73 @@ int main(int argc, const char * argv[]) {
     total = (numberOfWidgets * numberOfProducers);
     pthread_t arrayOfProducerThreads[numberOfProducers];
     pthread_t arrayOfConsumerThreads[numberOfConsumers];
-    period.tv_sec = timeToWait / 1000;
-    period.tv_nsec = (timeToWait % 1000) * 1000 * 1000;
     
-    for (int i = 0; i < numberOfProducers; i++) {
+    int i;
+    for (i = 0; i < numberOfProducers; i++) {
         if(pthread_create(&arrayOfProducerThreads[i], NULL, producer, NULL)){
             printf("Error creating producer thread\n");
             exit(3);
         }
     }
     
-    for (int i = 0; i < numberOfConsumers; i++) {
+    for (i = 0; i < numberOfConsumers; i++) {
         if(pthread_create(&arrayOfConsumerThreads[i], NULL, consumer, NULL)){
             printf("Error creating consumer thread\n");
             exit(3);
         }
     }
     
-    for (int i = 0; i < numberOfProducers; i++) {
+    for (i = 0; i < numberOfProducers; i++) {
         if(pthread_join(arrayOfProducerThreads[i], NULL)){
             printf("Error joining producer thread");
             exit(3);
         }
     }
     
-    for (int i = 0; i < numberOfConsumers; i++) {
+    for (i = 0; i < numberOfConsumers; i++) {
         if(pthread_join(arrayOfConsumerThreads[i], NULL)){
             printf("Error joining consumer thread");
             exit(3);
         }
     }
+
+    pthread_mutex_destroy(&lock);
+    pthread_cond_destroy(&Buffer_Not_Full);
+    pthread_cond_destroy(&Buffer_Not_Empty);
     
     return 0;
 }
 
 void* producer(){
-    pthread_mutex_lock(&mVar);
-    
-    for (int i = 0; i < numberOfWidgets; i++) {
-        
+    pthread_mutex_lock(&lock);
+    int i;
+    for (i = 0; i < numberOfWidgets; i++) {
         if(isFull()){
-            pthread_cond_wait(&Buffer_Not_Full,&mVar);
+            pthread_cond_wait(&Buffer_Not_Full,&lock);
         }
         struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
         widg -> producersID = pthread_self();
         widg -> widgetNumber = i;
         enqueue(widg);
         numberProduced++;
+	period.tv_nsec = (((rand() % timeToWait) % 1000) * 1000 * 1000);
+   	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
-        pthread_mutex_unlock(&mVar);
+        pthread_mutex_unlock(&lock);
         pthread_cond_signal(&Buffer_Not_Empty);
+    
     }
     pthread_exit(0);
 }
 
 void* consumer(){
-    pthread_mutex_lock(&mVar);
+    pthread_mutex_lock(&lock);
+    if(numberConsumed == total && isEmpty()){
+    	pthread_exit(0);
+    }
     while(numberConsumed < total){
         if(isEmpty()){
-            pthread_cond_wait(&Buffer_Not_Empty,&mVar);
+            pthread_cond_wait(&Buffer_Not_Empty,&lock);
         }
         struct widget* widg = dequeue();
         numberConsumed++;
@@ -128,8 +126,10 @@ void* consumer(){
                (int)pthread_self(), widg -> widgetNumber,
                (int)widg ->producersID);
         free(widg);
+	period.tv_nsec = (((rand() % timeToWait) % 1000) * 1000 * 1000);
+	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
-        pthread_mutex_unlock(&mVar);
+        pthread_mutex_unlock(&lock);
         pthread_cond_signal(&Buffer_Not_Full);
     }
     pthread_exit(0);
@@ -172,17 +172,14 @@ struct widget* dequeue(){
 }
 
 int isEmpty(){
-  
     return head ? 0 : 1;
 }
 
 int isFull(){
-
     struct widget* returnStatus = (struct widget*)malloc(sizeof(struct widget));
     int result = returnStatus ? 0 : 1;
     if (result == 1) {
         free(returnStatus);
     }
     return result;
-    
 }
