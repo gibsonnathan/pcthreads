@@ -5,7 +5,6 @@
 //  Created by Nathan Gibson on 1/29/15.
 //  Copyright (c) 2015 Nathan Gibson. All rights reserved.
 //
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -36,9 +35,13 @@ static pthread_mutex_t produceLock;
 static pthread_mutex_t consumeLock;
 static pthread_mutex_t isEmptyLock;
 static pthread_mutex_t isFullLock;
+static pthread_mutex_t lock;
+pthread_cond_t Buffer_Not_Full=PTHREAD_COND_INITIALIZER;
+pthread_cond_t Buffer_Not_Empty=PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mVar=PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, const char * argv[]) {
-
+    
     if (argc != 5) {
         printf("Incorrect arguments supplied\n");
         exit(-1);
@@ -47,6 +50,8 @@ int main(int argc, const char * argv[]) {
     pthread_mutex_init(&consumeLock, NULL);
     pthread_mutex_init(&isEmptyLock, NULL);
     pthread_mutex_init(&isFullLock, NULL);
+    pthread_mutex_init(&isFullLock, NULL);
+    
     head = NULL;
     numberProduced = 0;
     numberConsumed = 0;
@@ -54,7 +59,7 @@ int main(int argc, const char * argv[]) {
     numberOfConsumers = atoi(argv[2]);
     numberOfWidgets = atoi(argv[3]);
     timeToWait = atoi(argv[4]);
-    total = numberOfWidgets * numberOfProducers;
+    total = (numberOfWidgets * numberOfProducers);
     pthread_t arrayOfProducerThreads[numberOfProducers];
     pthread_t arrayOfConsumerThreads[numberOfConsumers];
     period.tv_sec = timeToWait / 1000;
@@ -72,7 +77,7 @@ int main(int argc, const char * argv[]) {
             printf("Error creating consumer thread\n");
             exit(3);
         }
-     }
+    }
     
     for (int i = 0; i < numberOfProducers; i++) {
         if(pthread_join(arrayOfProducerThreads[i], NULL)){
@@ -87,51 +92,47 @@ int main(int argc, const char * argv[]) {
             exit(3);
         }
     }
+    
     return 0;
 }
 
 void* producer(){
-    pthread_mutex_lock(&produceLock);
-    if((numberProduced>= (numberOfWidgets * numberOfProducers))){
-        pthread_exit(NULL);
-    }
-    while(isFull()){
-        pthread_yield_np();
-    }
-    for (int i = 0; i < numberOfWidgets && !isFull(); i++) {
+    pthread_mutex_lock(&mVar);
+    
+    for (int i = 0; i < numberOfWidgets; i++) {
+        
+        if(isFull()){
+            pthread_cond_wait(&Buffer_Not_Full,&mVar);
+        }
         struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
         widg -> producersID = pthread_self();
         widg -> widgetNumber = i;
         enqueue(widg);
         numberProduced++;
-        pthread_mutex_unlock(&produceLock);
         nanosleep(&period, NULL);
+        pthread_mutex_unlock(&mVar);
+        pthread_cond_signal(&Buffer_Not_Empty);
     }
-    return NULL;
+    pthread_exit(0);
 }
 
 void* consumer(){
-    while(1){
-        pthread_mutex_lock(&consumeLock);
-        printf("number produced %d total %i\n", numberProduced, total);
-    
-        
-        while(isEmpty()){
-        
+    pthread_mutex_lock(&mVar);
+    while(numberConsumed < total){
+        if(isEmpty()){
+            pthread_cond_wait(&Buffer_Not_Empty,&mVar);
         }
-
         struct widget* widg = dequeue();
         numberConsumed++;
-        printf("consumer (thread id: %d): widget %d from thread %d\n",
+        printf("consumer (thread id: %u): widget %u from thread %u\n",
                (int)pthread_self(), widg -> widgetNumber,
                (int)widg ->producersID);
-        
         free(widg);
-        pthread_mutex_unlock(&consumeLock);
         nanosleep(&period, NULL);
-        pthread_exit(NULL);
+        pthread_mutex_unlock(&mVar);
+        pthread_cond_signal(&Buffer_Not_Full);
     }
-    return NULL;
+    pthread_exit(0);
 }
 
 void enqueue(struct widget* widget){
@@ -171,20 +172,17 @@ struct widget* dequeue(){
 }
 
 int isEmpty(){
-    pthread_mutex_lock(&isEmptyLock);
-    int result = head ? 0 : 1;
-    pthread_mutex_unlock(&isEmptyLock);
-    return result;
+  
+    return head ? 0 : 1;
 }
 
 int isFull(){
-    pthread_mutex_lock(&isFullLock);
+
     struct widget* returnStatus = (struct widget*)malloc(sizeof(struct widget));
     int result = returnStatus ? 0 : 1;
     if (result == 1) {
         free(returnStatus);
     }
-    pthread_mutex_unlock(&isFullLock);
     return result;
     
 }
