@@ -25,6 +25,8 @@ static int numberConsumed;
 static int total;
 static struct timespec period;
 static pthread_mutex_t lock;
+static pthread_cond_t empty;
+static pthread_cond_t full;
 
 int main(int argc, const char * argv[]) {
     
@@ -32,6 +34,8 @@ int main(int argc, const char * argv[]) {
         printf("Incorrect arguments supplied\n");
         exit(-1);
     }
+    pthread_cond_init(&empty, NULL);
+    pthread_cond_init(&full, NULL);
     pthread_mutex_init(&lock, NULL);
     head = NULL;
     numberProduced = 0;
@@ -73,7 +77,8 @@ int main(int argc, const char * argv[]) {
         }
     }
     pthread_mutex_destroy(&lock);
-    
+    pthread_cond_destroy(&empty);
+    pthread_cond_destroy(&full);
     return 0;
 }
 
@@ -82,32 +87,34 @@ void* producer(){
     int i;
     for (i = 0; i < numberOfWidgets; i++) {
         if(isFull()){
-	    pthread_yield();
+	    pthread_cond_wait(&empty, &lock);
         }
         struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
         widg -> producersID = pthread_self();
         widg -> widgetNumber = i;
         enqueue(widg);
         numberProduced++;
+	pthread_cond_broadcast(&full);
 	period.tv_nsec = (((rand() % timeToWait) % 1000) * 1000 * 1000);
    	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
-        pthread_mutex_unlock(&lock); 
     }
+    pthread_mutex_unlock(&lock);
     pthread_exit(0);
 }
 
 void* consumer(){
     pthread_mutex_lock(&lock);
-    if((numberConsumed == total && isEmpty()) || (numberProduced == total && isEmpty())){
+    if(numberConsumed == total && isEmpty()){
     	pthread_exit(0);
     }
     while(numberConsumed < total){
         if(isEmpty()){
-	    pthread_yield();
+	    pthread_cond_wait(&full, &lock);
         }
         struct widget* widg = dequeue();
         numberConsumed++;
+	pthread_cond_broadcast(&empty);
         printf("consumer (thread id: %u): widget %u from thread %u\n",
                (int)pthread_self(), widg -> widgetNumber,
                (int)widg ->producersID);
