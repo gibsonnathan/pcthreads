@@ -24,8 +24,6 @@ static int numberProduced;
 static int numberConsumed;
 static int total;
 static struct timespec period;
-static pthread_cond_t queueNotFull;
-static pthread_cond_t queueNotEmpty;
 static pthread_mutex_t lock;
 
 int main(int argc, const char * argv[]) {
@@ -34,8 +32,6 @@ int main(int argc, const char * argv[]) {
         printf("Incorrect arguments supplied\n");
         exit(-1);
     }
-    pthread_cond_init(&queueNotFull, NULL);
-    pthread_cond_init(&queueNotEmpty, NULL);
     pthread_mutex_init(&lock, NULL);
     head = NULL;
     numberProduced = 0;
@@ -77,8 +73,6 @@ int main(int argc, const char * argv[]) {
         }
     }
     pthread_mutex_destroy(&lock);
-    pthread_cond_destroy(&queueNotFull);
-    pthread_cond_destroy(&queueNotEmpty);
     
     return 0;
 }
@@ -88,7 +82,7 @@ void* producer(){
     int i;
     for (i = 0; i < numberOfWidgets; i++) {
         if(isFull()){
-            pthread_cond_wait(&queueNotFull,&lock);
+	    pthread_yield();
         }
         struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
         widg -> producersID = pthread_self();
@@ -98,8 +92,7 @@ void* producer(){
 	period.tv_nsec = (((rand() % timeToWait) % 1000) * 1000 * 1000);
    	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
-        pthread_mutex_unlock(&lock);
-        pthread_cond_signal(&queueNotEmpty); 
+        pthread_mutex_unlock(&lock); 
     }
     pthread_exit(0);
 }
@@ -111,7 +104,7 @@ void* consumer(){
     }
     while(numberConsumed < total){
         if(isEmpty()){
-            pthread_cond_wait(&queueNotEmpty,&lock);
+	    pthread_yield();
         }
         struct widget* widg = dequeue();
         numberConsumed++;
@@ -123,7 +116,6 @@ void* consumer(){
 	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
         pthread_mutex_unlock(&lock);
-        pthread_cond_signal(&queueNotFull);
     }
     pthread_exit(0);
 }
