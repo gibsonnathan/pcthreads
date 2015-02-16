@@ -1,10 +1,3 @@
-//
-//  main.c
-//  Asn2
-//
-//  Created by Nathan Gibson on 1/29/15.
-//  Copyright (c) 2015 Nathan Gibson. All rights reserved.
-//
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
@@ -31,8 +24,8 @@ static int numberProduced;
 static int numberConsumed;
 static int total;
 static struct timespec period;
-static pthread_cond_t Buffer_Not_Full=PTHREAD_COND_INITIALIZER;
-static pthread_cond_t Buffer_Not_Empty=PTHREAD_COND_INITIALIZER;
+static pthread_cond_t queueNotFull;
+static pthread_cond_t queueNotEmpty;
 static pthread_mutex_t lock;
 
 int main(int argc, const char * argv[]) {
@@ -41,6 +34,8 @@ int main(int argc, const char * argv[]) {
         printf("Incorrect arguments supplied\n");
         exit(-1);
     }
+    pthread_cond_init(&queueNotFull, NULL);
+    pthread_cond_init(&queueNotEmpty, NULL);
     pthread_mutex_init(&lock, NULL);
     head = NULL;
     numberProduced = 0;
@@ -81,10 +76,9 @@ int main(int argc, const char * argv[]) {
             exit(3);
         }
     }
-
     pthread_mutex_destroy(&lock);
-    pthread_cond_destroy(&Buffer_Not_Full);
-    pthread_cond_destroy(&Buffer_Not_Empty);
+    pthread_cond_destroy(&queueNotFull);
+    pthread_cond_destroy(&queueNotEmpty);
     
     return 0;
 }
@@ -94,7 +88,7 @@ void* producer(){
     int i;
     for (i = 0; i < numberOfWidgets; i++) {
         if(isFull()){
-            pthread_cond_wait(&Buffer_Not_Full,&lock);
+            pthread_cond_wait(&queueNotFull,&lock);
         }
         struct widget* widg = (struct widget*)malloc(sizeof(struct widget));
         widg -> producersID = pthread_self();
@@ -105,20 +99,19 @@ void* producer(){
    	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
         pthread_mutex_unlock(&lock);
-        pthread_cond_signal(&Buffer_Not_Empty);
-    
+        pthread_cond_signal(&queueNotEmpty); 
     }
     pthread_exit(0);
 }
 
 void* consumer(){
     pthread_mutex_lock(&lock);
-    if(numberConsumed == total && isEmpty()){
+    if((numberConsumed == total && isEmpty()) || (numberProduced == total && isEmpty())){
     	pthread_exit(0);
     }
     while(numberConsumed < total){
         if(isEmpty()){
-            pthread_cond_wait(&Buffer_Not_Empty,&lock);
+            pthread_cond_wait(&queueNotEmpty,&lock);
         }
         struct widget* widg = dequeue();
         numberConsumed++;
@@ -130,7 +123,7 @@ void* consumer(){
 	period.tv_sec = ((rand() % timeToWait) / 1000);
         nanosleep(&period, NULL);
         pthread_mutex_unlock(&lock);
-        pthread_cond_signal(&Buffer_Not_Full);
+        pthread_cond_signal(&queueNotFull);
     }
     pthread_exit(0);
 }
